@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador del ciclo de instrucción — Intel 80186 (modo real)</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <h1>🖥️ Ciclo de instrucción en modo real — Intel 80186</h1>
+    <div class="stage-indicator" id="stageIndicator">
+      <span class="stage-pill" data-stage="fetch">1&nbsp;FETCH</span>
+      <span class="stage-pill" data-stage="decode">2&nbsp;DECODE</span>
+      <span class="stage-pill" data-stage="execute">3&nbsp;EXECUTE</span>
+      <span class="stage-pill" data-stage="writeback">4&nbsp;WRITEBACK</span>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ================= Columna izquierda: editor ================= -->
+    <section class="panel editor-panel">
+      <h2>Editor de ensamblador</h2>
+      <div class="editor-toolbar">
+        <select id="exampleSelect" title="Cargar un ejemplo"></select>
+        <button id="btnAssemble" class="btn primary">▶ Ensamblar y ejecutar</button>
+      </div>
+      <textarea id="asmEditor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+      <div id="errorsBox" class="errors-box" hidden></div>
+
+      <div class="controls">
+        <button id="btnStep" title="Ejecuta una instrucción completa (4 etapas)">⏭ Paso</button>
+        <button id="btnRun" title="Ejecuta continuamente">▶ Run</button>
+        <button id="btnPause" disabled>⏸ Pausa</button>
+        <button id="btnReset" title="Reinicia la CPU y vuelve a cargar el programa">⏹ Reset</button>
+      </div>
+      <label class="speed-label">
+        Velocidad de animación
+        <input type="range" id="speedRange" min="60" max="900" value="350">
+        <span id="speedValue"></span>
+      </label>
+      <p class="help-text">
+        Escribí tu propio programa o elegí un ejemplo del menú. Sintaxis
+        estilo Intel (MASM/TASM simplificado): <code>mov ax, 5</code>,
+        etiquetas con <code>:</code> (o sin él antes de <code>db</code>/<code>dw</code>),
+        comentarios con <code>;</code>. Ver <a href="README.md" target="_blank">README</a>
+        para la lista completa de instrucciones soportadas.
+      </p>
+    </section>
+
+    <!-- ================= Columna central: diagrama de CPU ================= -->
+    <section class="panel diagram-panel">
+      <h2>Diagrama de la CPU</h2>
+
+      <div class="cpu-diagram" id="cpuDiagram">
+
+        <div class="diagram-row">
+          <div class="cpu-block" id="blockMemory">
+            <h3>Memoria — entorno de CS:IP</h3>
+            <div class="hexdump" id="memHexdump"></div>
+          </div>
+          <div class="bus-arrow" data-stage="fetch" id="busFetch">FETCH<br>→</div>
+          <div class="cpu-block" id="blockIR">
+            <h3>Registro de instrucción (IR)</h3>
+            <div class="ir-bytes" id="irBytes">—</div>
+          </div>
+        </div>
+
+        <div class="diagram-row bus-row">
+          <div class="bus-arrow vertical" data-stage="decode" id="busDecode">↓ DECODE ↓</div>
+        </div>
+
+        <div class="diagram-row">
+          <div class="cpu-block" id="blockDecoder">
+            <h3>Decodificador</h3>
+            <div id="decoderInfo" class="mono">—</div>
+          </div>
+          <div class="bus-arrow" data-stage="execute" id="busExecute">EXECUTE<br>→</div>
+          <div class="cpu-block" id="blockALU">
+            <h3>ALU</h3>
+            <div id="aluInfo" class="mono">—</div>
+          </div>
+          <div class="bus-arrow" data-stage="writeback" id="busWriteback">WRITEBACK<br>→</div>
+          <div class="cpu-block" id="blockRegisters">
+            <h3>Registros</h3>
+            <div class="reg-grid" id="regGrid"></div>
+          </div>
+        </div>
+
+        <div class="diagram-row secondary">
+          <div class="cpu-block" id="blockSegments">
+            <h3>Segmentos y dirección física</h3>
+            <div class="seg-grid" id="segGrid"></div>
+            <div id="physAddrInfo" class="phys-addr">CS:IP → física = (CS×16)+IP</div>
+          </div>
+          <div class="cpu-block" id="blockFlags">
+            <h3>Flags</h3>
+            <div class="flags-row" id="flagsRow"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <p class="status-line" id="statusBar">Listo. Elegí un ejemplo o escribí tu código y presioná «Ensamblar y ejecutar».</p>
+    </section>
+
+    <!-- ================= Columna derecha: pestañas ================= -->
+    <section class="panel side-panel">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="trace">Programa</button>
+        <button class="tab-btn" data-tab="stack">Pila</button>
+        <button class="tab-btn" data-tab="console">Consola</button>
+      </div>
+      <div class="tab-content" id="tabTrace">
+        <table class="trace-table">
+          <thead><tr><th>Dir.</th><th>Bytes</th><th>Instrucción</th></tr></thead>
+          <tbody id="traceBody"></tbody>
+        </table>
+      </div>
+      <div class="tab-content" id="tabStack" hidden>
+        <table class="stack-table">
+          <thead><tr><th>SS:offset</th><th>Valor</th></tr></thead>
+          <tbody id="stackBody"></tbody>
+        </table>
+      </div>
+      <div class="tab-content" id="tabConsole" hidden>
+        <pre id="consoleOutput" class="console-output"></pre>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="js/isa.js"></script>
+<script src="js/cpu.js"></script>
+<script src="js/assembler.js"></script>
+<script src="js/decoder.js"></script>
+<script src="js/executor.js"></script>
+<script src="js/cycle-engine.js"></script>
+<script src="js/examples.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
