@@ -16,6 +16,9 @@
   const editor = el('asmEditor');
   const exampleSelect = el('exampleSelect');
   const btnAssemble = el('btnAssemble');
+  const btnNewScript = el('btnNewScript');
+  const btnDuplicateExample = el('btnDuplicateExample');
+  const btnDeleteScript = el('btnDeleteScript');
   const btnStep = el('btnStep');
   const btnRun = el('btnRun');
   const btnPause = el('btnPause');
@@ -24,20 +27,106 @@
   const speedValue = el('speedValue');
   const errorsBox = el('errorsBox');
   const statusBar = el('statusBar');
+  const glossarySearch = el('glossarySearch');
+  const glossaryList = el('glossaryList');
 
   // ---------------------------------------------------------------
-  // Selector de ejemplos
+  // Selector de ejemplos (solo lectura) + scripts propios (editables,
+  // en memoria, no persisten entre recargas)
   // ---------------------------------------------------------------
-  EXAMPLES.forEach((ex, i) => {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = ex.title;
-    exampleSelect.appendChild(opt);
+  let userScripts = []; // { title, code }
+
+  function renderScriptOptions(selectedValue) {
+    exampleSelect.innerHTML = '';
+
+    const examplesGroup = document.createElement('optgroup');
+    examplesGroup.label = 'Ejemplos';
+    EXAMPLES.forEach((ex, i) => {
+      const opt = document.createElement('option');
+      opt.value = 'ex:' + i;
+      opt.textContent = ex.title;
+      examplesGroup.appendChild(opt);
+    });
+    exampleSelect.appendChild(examplesGroup);
+
+    const userGroup = document.createElement('optgroup');
+    userGroup.label = 'Mis scripts';
+    if (userScripts.length === 0) {
+      const opt = document.createElement('option');
+      opt.disabled = true;
+      opt.textContent = 'No hay scripts propios todavía';
+      userGroup.appendChild(opt);
+    } else {
+      userScripts.forEach((s, i) => {
+        const opt = document.createElement('option');
+        opt.value = 'user:' + i;
+        opt.textContent = s.title;
+        userGroup.appendChild(opt);
+      });
+    }
+    exampleSelect.appendChild(userGroup);
+
+    if (selectedValue) exampleSelect.value = selectedValue;
+  }
+
+  function loadSelection(value) {
+    const [type, idxStr] = value.split(':');
+    const idx = Number(idxStr);
+    if (type === 'ex') {
+      editor.value = EXAMPLES[idx].code;
+      editor.readOnly = true;
+      btnDeleteScript.hidden = true;
+      btnDuplicateExample.hidden = false;
+    } else {
+      editor.value = userScripts[idx].code;
+      editor.readOnly = false;
+      btnDeleteScript.hidden = false;
+      btnDuplicateExample.hidden = true;
+    }
+  }
+
+  exampleSelect.addEventListener('change', () => loadSelection(exampleSelect.value));
+
+  editor.addEventListener('input', () => {
+    const [type, idxStr] = exampleSelect.value.split(':');
+    if (type === 'user') userScripts[Number(idxStr)].code = editor.value;
   });
-  exampleSelect.addEventListener('change', () => {
-    editor.value = EXAMPLES[Number(exampleSelect.value)].code;
+
+  btnNewScript.addEventListener('click', () => {
+    const name = prompt('Nombre del nuevo script:', 'Mi script ' + (userScripts.length + 1));
+    if (!name) return;
+    userScripts.push({ title: name, code: '; ' + name + '\n\n' });
+    const value = 'user:' + (userScripts.length - 1);
+    renderScriptOptions(value);
+    loadSelection(value);
+    editor.focus();
   });
-  editor.value = EXAMPLES[0].code;
+
+  btnDuplicateExample.addEventListener('click', () => {
+    const [type, idxStr] = exampleSelect.value.split(':');
+    if (type !== 'ex') return;
+    const ex = EXAMPLES[Number(idxStr)];
+    const name = prompt('Nombre del nuevo script:', ex.title + ' (copia)');
+    if (!name) return;
+    userScripts.push({ title: name, code: ex.code });
+    const value = 'user:' + (userScripts.length - 1);
+    renderScriptOptions(value);
+    loadSelection(value);
+    editor.focus();
+  });
+
+  btnDeleteScript.addEventListener('click', () => {
+    const [type, idxStr] = exampleSelect.value.split(':');
+    if (type !== 'user') return;
+    const idx = Number(idxStr);
+    if (!confirm('¿Eliminar "' + userScripts[idx].title + '"?')) return;
+    userScripts.splice(idx, 1);
+    renderScriptOptions('ex:0');
+    loadSelection('ex:0');
+  });
+
+  renderScriptOptions();
+  loadSelection('ex:0');
 
   editor.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doAssemble(); }
@@ -399,6 +488,67 @@
       Object.keys(TAB_IDS).forEach(name => { el(TAB_IDS[name]).hidden = (name !== btn.dataset.tab); });
     });
   });
+
+  // ---------------------------------------------------------------
+  // Glosario de instrucciones + filtro rápido con F1
+  // ---------------------------------------------------------------
+  const glossaryEntries = Object.keys(INSTRUCTION_DOCS).sort().map(mnemonic => ({
+    mnemonic, syntax: INSTRUCTION_DOCS[mnemonic].syntax, desc: INSTRUCTION_DOCS[mnemonic].desc
+  }));
+
+  function renderGlossaryList(filter) {
+    const term = (filter || '').trim().toUpperCase();
+    glossaryList.innerHTML = '';
+    const matches = glossaryEntries.filter(e =>
+      !term || e.mnemonic.includes(term) || e.syntax.toUpperCase().includes(term) || e.desc.toUpperCase().includes(term));
+    if (matches.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'glossary-empty';
+      empty.textContent = 'No se encontraron instrucciones.';
+      glossaryList.appendChild(empty);
+      return;
+    }
+    matches.forEach(e => {
+      const item = document.createElement('div');
+      item.className = 'glossary-item';
+      item.innerHTML = `<h4>${e.mnemonic}</h4><code>${e.syntax}</code><p>${e.desc}</p>`;
+      glossaryList.appendChild(item);
+    });
+  }
+  renderGlossaryList();
+  glossarySearch.addEventListener('input', () => renderGlossaryList(glossarySearch.value));
+
+  // Alto del glosario, igual al del panel del diagrama de CPU (que ahora
+  // ocupa toda la fila superior gracias a align-items: stretch en .layout,
+  // así que Programa/Pila/Consola quedan igualados por CSS, sin JS).
+  const editorGlossary = el('editorGlossary');
+  const diagramPanel = document.querySelector('.diagram-panel');
+  function syncGlossaryHeight() {
+    if (diagramPanel) editorGlossary.style.height = diagramPanel.offsetHeight + 'px';
+  }
+  syncGlossaryHeight();
+  window.addEventListener('resize', syncGlossaryHeight);
+
+  function getWordAtCursor(text, pos) {
+    const isWordChar = c => /[A-Za-z]/.test(c);
+    let start = pos, end = pos;
+    while (start > 0 && isWordChar(text[start - 1])) start--;
+    while (end < text.length && isWordChar(text[end])) end++;
+    return text.slice(start, end);
+  }
+
+  editor.addEventListener('keydown', e => {
+    if (e.key !== 'F1') return;
+    e.preventDefault();
+    const word = getWordAtCursor(editor.value, editor.selectionStart);
+    if (!word) return;
+    const doc = lookupInstructionDoc(word);
+    const term = doc ? doc.mnemonic : word;
+    glossarySearch.value = term;
+    renderGlossaryList(term);
+    glossaryList.scrollTop = 0;
+  });
+  btnCloseInstructionHelp.addEventListener('click', () => { instructionHelp.hidden = true; });
 
   // ---------------------------------------------------------------
   // Estado inicial

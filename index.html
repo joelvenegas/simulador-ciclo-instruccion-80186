@@ -21,36 +21,6 @@
 
   <main class="layout">
 
-    <!-- ================= Columna izquierda: editor ================= -->
-    <section class="panel editor-panel">
-      <h2>Editor de ensamblador</h2>
-      <div class="editor-toolbar">
-        <select id="exampleSelect" title="Cargar un ejemplo"></select>
-        <button id="btnAssemble" class="btn primary">▶ Ensamblar y ejecutar</button>
-      </div>
-      <textarea id="asmEditor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
-      <div id="errorsBox" class="errors-box" hidden></div>
-
-      <div class="controls">
-        <button id="btnStep" title="Ejecuta una instrucción completa (4 etapas)">⏭ Paso</button>
-        <button id="btnRun" title="Ejecuta continuamente">▶ Run</button>
-        <button id="btnPause" disabled>⏸ Pausa</button>
-        <button id="btnReset" title="Reinicia la CPU y vuelve a cargar el programa">⏹ Reset</button>
-      </div>
-      <label class="speed-label">
-        Velocidad de animación
-        <input type="range" id="speedRange" min="60" max="900" value="350">
-        <span id="speedValue"></span>
-      </label>
-      <p class="help-text">
-        Escribí tu propio programa o elegí un ejemplo del menú. Sintaxis
-        estilo Intel (MASM/TASM simplificado): <code>mov ax, 5</code>,
-        etiquetas con <code>:</code> (o sin él antes de <code>db</code>/<code>dw</code>),
-        comentarios con <code>;</code>. Ver <a href="README.md" target="_blank">README</a>
-        para la lista completa de instrucciones soportadas.
-      </p>
-    </section>
-
     <!-- ================= Columna central: diagrama de CPU ================= -->
     <section class="panel diagram-panel">
       <h2>Diagrama de la CPU</h2>
@@ -132,6 +102,54 @@
     </section>
 
   </main>
+
+  <!-- ================= Panel inferior: editor de ensamblador ================= -->
+  <section class="panel editor-panel bottom-panel">
+    <h2>Editor de ensamblador</h2>
+    <div class="editor-toolbar">
+      <select id="exampleSelect" title="Elegir un ejemplo o un script propio"></select>
+      <button id="btnAssemble" class="btn primary">▶ Ensamblar y ejecutar</button>
+      <button id="btnNewScript" class="btn">➕ Nuevo script</button>
+      <button id="btnDuplicateExample" class="btn" hidden>📋 Duplicar como nuevo script</button>
+      <button id="btnDeleteScript" class="btn" hidden>🗑 Eliminar script</button>
+    </div>
+    <div class="editor-body">
+      <div class="editor-main">
+        <textarea id="asmEditor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+        <div id="errorsBox" class="errors-box" hidden></div>
+      </div>
+      <div class="editor-glossary" id="editorGlossary">
+        <h3>Glosario</h3>
+        <input type="text" id="glossarySearch" class="glossary-search" placeholder="Buscar instrucción (ej: mov, jmp, loop)...">
+        <div id="glossaryList" class="glossary-list"></div>
+      </div>
+      <div class="editor-side">
+        <div class="controls">
+          <button id="btnStep" title="Ejecuta una instrucción completa (4 etapas)">⏭ Paso</button>
+          <button id="btnRun" title="Ejecuta continuamente">▶ Run</button>
+          <button id="btnPause" disabled>⏸ Pausa</button>
+          <button id="btnReset" title="Reinicia la CPU y vuelve a cargar el programa">⏹ Reset</button>
+        </div>
+        <label class="speed-label">
+          Velocidad de animación
+          <input type="range" id="speedRange" min="60" max="900" value="350">
+          <span id="speedValue"></span>
+        </label>
+        <p class="help-text">
+          Los ejemplos del menú se muestran de solo lectura. Presioná
+          <strong>«➕ Nuevo script»</strong> para escribir tu propio programa
+          (podés tener varios, con nombre), o <strong>«📋 Duplicar como nuevo
+          script»</strong> para partir del ejemplo actual y modificarlo.
+          Sintaxis estilo Intel (MASM/TASM simplificado): <code>mov ax, 5</code>,
+          etiquetas con <code>:</code> (o sin él antes de <code>db</code>/<code>dw</code>),
+          comentarios con <code>;</code>. Poné el cursor sobre una instrucción y
+          presioná <strong>F1</strong> para filtrar el <strong>Glosario</strong>
+          (a la derecha del editor) por esa instrucción. Ver
+          <a href="README.md" target="_blank">README</a> para más detalles.
+        </p>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script src="js/isa.js"></script>
@@ -141,6 +159,7 @@
 <script src="js/executor.js"></script>
 <script src="js/cycle-engine.js"></script>
 <script src="js/examples.js"></script>
+<script src="js/instruction-docs.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

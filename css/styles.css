@@ -63,14 +63,52 @@ html, body {
 /* ---------------- Layout general ---------------- */
 .layout {
   flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 380px minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
   padding: 16px 20px;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 1150px) {
   .layout { grid-template-columns: 1fr; }
+}
+
+/* ---------------- Panel inferior: editor ---------------- */
+.bottom-panel {
+  margin: 0 20px 16px;
+}
+.editor-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.editor-main {
+  flex: 1;
+  min-width: 0;
+}
+.editor-glossary {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0 14px;
+  overflow: hidden;
+}
+.editor-side {
+  width: 300px;
+  flex: 0 0 300px;
+}
+@media (max-width: 1250px) {
+  .editor-body { flex-wrap: wrap; }
+  .editor-main { flex: 1 1 100%; }
+  .editor-glossary, .editor-side { flex: 1 1 280px; }
+}
+@media (max-width: 900px) {
+  .editor-body { flex-direction: column; }
+  .editor-glossary, .editor-side { width: 100%; flex: 1; height: 320px; }
 }
 
 .panel {
@@ -128,6 +166,11 @@ html, body {
   overflow: auto;
 }
 #asmEditor:focus { outline: none; border-color: var(--accent-fetch); }
+#asmEditor[readonly] {
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
 
 .errors-box {
   margin-top: 10px;
@@ -249,11 +292,17 @@ html, body {
 .flag-badge.set { color: #041322; background: var(--accent-writeback); border-color: var(--accent-writeback); }
 .flag-badge.changed { box-shadow: 0 0 8px var(--accent-writeback); }
 
-.status-line { margin: 12px 0 0; font-size: 0.8rem; color: var(--text-dim); min-height: 1.2em; }
+.diagram-panel { display: flex; flex-direction: column; }
+.status-line { margin: 12px 0 0; font-size: 0.8rem; color: var(--text-dim); min-height: 1.2em; margin-top: auto; padding-top: 12px; }
 .status-line.error { color: var(--danger); }
 
 /* ---------------- Panel lateral (pestañas) ---------------- */
-.tabs { display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tabs { display: flex; gap: 4px; margin-bottom: 10px; border-bottom: 1px solid var(--border); flex: 0 0 auto; }
 .tab-btn {
   background: none;
   border: none;
@@ -265,7 +314,7 @@ html, body {
 }
 .tab-btn.active { color: var(--text); border-bottom-color: var(--accent-fetch); }
 
-.tab-content { max-height: 640px; overflow-y: auto; }
+.tab-content { flex: 1; min-height: 0; overflow-y: auto; }
 
 .trace-table, .stack-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.72rem; }
 .trace-table th, .stack-table th {
@@ -285,3 +334,35 @@ html, body {
   margin: 0;
   color: #7ee787;
 }
+
+/* ---------------- Glosario de instrucciones ---------------- */
+.glossary-search {
+  width: 100%;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+}
+.glossary-item {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+}
+.glossary-item h4 {
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--accent-fetch);
+}
+.glossary-item code {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.glossary-item p { margin: 0; font-size: 0.78rem; line-height: 1.4; }
+.glossary-list { flex: 1; min-height: 0; overflow-y: auto; }
+.glossary-empty { color: var(--text-dim); font-size: 0.78rem; }
