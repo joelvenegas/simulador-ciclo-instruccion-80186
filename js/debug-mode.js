@@ -158,6 +158,47 @@
     }
   }
 
+  // El comando "a" reusa el ensamblador general (js/assembler.js), que
+  // sigue sintaxis MASM: un número es decimal salvo que lleve 0x/h/b. En
+  // el DEBUG.COM real, en cambio, TODOS los números que se tipean en el
+  // modo de ensamblado en línea son hexadecimales, sin sufijo. Por eso acá
+  // reescribimos cada token numérico "pelado" (solo dígitos hex, sin 0x/h/b
+  // ya puestos) a forma "0x..." antes de pasarlo al ensamblador, para que
+  // "c" o "10" se interpreten como 0xC/0x10, tal como en DEBUG.COM.
+  const ASM_KEYWORDS = new Set([
+    ...REG16_NAMES, ...SREG_NAMES,
+    'AL', 'AH', 'BL', 'BH', 'CL', 'CH', 'DL', 'DH',
+    'BYTE', 'WORD', 'PTR'
+  ]);
+  function forceHexNumbers(operand) {
+    let out = '';
+    let i = 0;
+    while (i < operand.length) {
+      const c = operand[i];
+      if (c === '"' || c === "'") {
+        const q = c; let j = i + 1;
+        while (j < operand.length && operand[j] !== q) j++;
+        out += operand.slice(i, j + 1);
+        i = j + 1;
+        continue;
+      }
+      const m = /^[0-9A-Za-z_]+/.exec(operand.slice(i));
+      if (m) {
+        const tok = m[0];
+        if (!ASM_KEYWORDS.has(tok.toUpperCase()) && /^[0-9A-Fa-f]+$/.test(tok) && !/^0x/i.test(tok) && !/h$/i.test(tok)) {
+          out += '0x' + tok;
+        } else {
+          out += tok;
+        }
+        i += tok.length;
+        continue;
+      }
+      out += c;
+      i++;
+    }
+    return out;
+  }
+
   function cmdAssembleStart(rest) {
     let seg = state.cursorSeg, off = state.cursorOff;
     const tok = rest.trim();
@@ -186,6 +227,7 @@
       } else {
         operandsRaw = splitOperands(rest);
       }
+      operandsRaw = operandsRaw.map(forceHexNumbers);
       const here = (state.asmOff + (repPrefix !== null ? 1 : 0)) & 0xFFFF;
       let bytes = ASSEMBLER.encodeInstruction(mnemonic, operandsRaw, { symbols: {}, here, lenient: false });
       if (repPrefix !== null) bytes = [repPrefix, ...bytes];
@@ -237,6 +279,20 @@
     state.cursorSeg = a.seg; state.cursorOff = off;
   }
 
+  function cmdClear() {
+    debugOutput.textContent = '';
+  }
+
+  function cmdReset() {
+    cpu.reset();
+    state.mode = 'normal';
+    state.cursorSeg = cpu.sreg.DS;
+    state.cursorOff = 0;
+    state.asmSeg = cpu.sreg.CS;
+    state.asmOff = 0;
+    appendOutput('CPU de debug reiniciada.');
+  }
+
   function cmdHelp() {
     [
       'Comandos disponibles (direcciones y valores en hexadecimal):',
@@ -249,6 +305,8 @@
       '  t [n]          ejecuta n instrucciones (1 por defecto) y muestra registros',
       '  g [dir]        corre hasta HLT o hasta llegar a la dirección (breakpoint)',
       '  e dir b b ...  escribe bytes crudos en memoria',
+      '  reset          reinicia la CPU de debug (registros, memoria y flags)',
+      '  cls            limpia la pantalla (no toca CPU ni memoria)',
       '  q              vuelve al modo visual',
       '  ?              esta ayuda',
       'Direcciones: "seg:off" o solo "off" (usa el segmento por defecto del comando).',
@@ -268,6 +326,8 @@
       case 't': cmdTrace(rest); break;
       case 'g': cmdGo(rest); break;
       case 'e': cmdEnter(rest); break;
+      case 'reset': cmdReset(); break;
+      case 'cls': cmdClear(); break;
       case 'q': exitDebugMode(); break;
       case '?': case 'h': case 'help': cmdHelp(); break;
       default: appendOutput('Comando no reconocido: "' + cmd + '" (escribí ? para ayuda)');
