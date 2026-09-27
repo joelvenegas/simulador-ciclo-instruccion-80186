@@ -350,7 +350,13 @@
       return [table[op.name]];
     }
     if (op.kind === 'imm') { const val = resolveOperandValue(op, ctx); return [0x68, val & 0xFF, (val >> 8) & 0xFF]; }
-    throw new Error('PUSH sólo admite un registro de 16 bits, un registro de segmento o un inmediato');
+    if (op.kind === 'mem') {
+      // PUSH r/m16 (0xFF /6): PUSH siempre mueve una palabra completa, no
+      // hace falta (ni tiene sentido) BYTE/WORD explícito como en INC/DEC.
+      const { prefix, bytes } = encodeRM(op, 6, ctx);
+      return withPrefix(prefix, [0xFF, ...bytes]);
+    }
+    throw new Error('PUSH sólo admite un registro de 16 bits, un registro de segmento, un inmediato o memoria');
   }
   function encodePop(ops, ctx) {
     if (ops.length !== 1) throw new Error('POP requiere 1 operando');
@@ -361,7 +367,12 @@
       if (!(op.name in table)) throw new Error('No se puede hacer POP sobre CS');
       return [table[op.name]];
     }
-    throw new Error('POP sólo admite un registro de 16 bits o un registro de segmento (excepto CS)');
+    if (op.kind === 'mem') {
+      // POP r/m16 (0x8F /0), simétrico al PUSH de memoria de arriba.
+      const { prefix, bytes } = encodeRM(op, 0, ctx);
+      return withPrefix(prefix, [0x8F, ...bytes]);
+    }
+    throw new Error('POP sólo admite un registro de 16 bits, un registro de segmento (excepto CS) o memoria');
   }
 
   function encodeMulDiv(mnemonic, ops, ctx) {

@@ -156,8 +156,18 @@
     if (opcode === 0xFE || opcode === 0xFF) {
       const size = opcode === 0xFF ? 16 : 8;
       const m = readModRM();
+      if (opcode === 0xFF && m.reg === 6) {
+        // PUSH r/m16 (0xFF /6): comparte opcode con INC/DEC de 16 bits,
+        // pero el operando va en "src" (igual que las otras formas de PUSH).
+        return finalize({ mnemonic: 'PUSH', size: 16, src: rmOperand(m, 16), dst: null });
+      }
       const mnemonic = m.reg === 0 ? 'INC' : (m.reg === 1 ? 'DEC' : ('GRP5_' + m.reg));
       return finalize({ mnemonic, size, dst: rmOperand(m, size), src: null });
+    }
+    if (opcode === 0x8F) {
+      // POP r/m16 (0x8F /0).
+      const m = readModRM();
+      return finalize({ mnemonic: 'POP', size: 16, dst: rmOperand(m, 16), src: null });
     }
 
     if (opcode === 0xE9) { const rel = signed16(fetch16()); return finalize({ mnemonic: 'JMP', rel }); }
