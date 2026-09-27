@@ -63,6 +63,19 @@
   }
   function printState() { appendOutput(fmtRegLine1()); appendOutput(fmtRegLine2()); appendOutput(fmtCurrentInstr()); }
 
+  // La consola simulada de DOS (INT 21h AH=02h/09h) va empujando texto a
+  // cpu.output; acá lo volcamos a la pantalla de debug a medida que
+  // aparece, sin el salto de línea automático de appendOutput (el propio
+  // texto ya trae sus \r\n si el programa los imprimió).
+  let outputCursor = 0;
+  function flushCpuOutput() {
+    while (outputCursor < cpu.output.length) {
+      debugOutput.textContent += cpu.output[outputCursor];
+      outputCursor++;
+    }
+    debugOutput.scrollTop = debugOutput.scrollHeight;
+  }
+
   // ---------------------------------------------------------------
   // Parsing léxico (subset simplificado, números siempre en hex, sin
   // sufijo "h", como en el DEBUG.COM real)
@@ -245,6 +258,7 @@
     for (let i = 0; i < count; i++) {
       if (cpu.halted) { appendOutput('CPU detenida (HLT).'); break; }
       engine.stepInstruction();
+      flushCpuOutput();
       printState();
     }
   }
@@ -258,6 +272,7 @@
       if (cpu.halted) break;
       if (bpPhys !== null && cpu.physicalAddress(cpu.sreg.CS, cpu.reg.IP) === bpPhys) { hitBreakpoint = true; break; }
       engine.stepInstruction();
+      flushCpuOutput();
       steps++;
     }
     if (steps >= MAX_GO_STEPS) appendOutput('(detenido: posible loop infinito tras ' + MAX_GO_STEPS + ' pasos)');
@@ -265,14 +280,44 @@
     printState();
   }
 
+  // Convierte la lista de bytes/strings de "e" en un array de valores 0-255.
+  // Acepta bytes hex sueltos ("0D", "0A") y texto entre comillas simples o
+  // dobres ("Hola", 'Hola'), cada carácter aporta un byte (su código ASCII).
+  // No hace falta espacio entre una comilla de cierre y el siguiente token
+  // (p. ej. "Hola"0D0A"$"), igual que en el E de DEBUG.COM real.
+  function tokenizeEnterList(str) {
+    const bytes = [];
+    let i = 0;
+    while (i < str.length) {
+      const c = str[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === '"' || c === "'") {
+        const q = c;
+        let j = i + 1;
+        while (j < str.length && str[j] !== q) j++;
+        if (j >= str.length) throw new Error('Falta la comilla de cierre: ' + str.slice(i));
+        for (const ch of str.slice(i + 1, j)) bytes.push(ch.charCodeAt(0) & 0xFF);
+        i = j + 1;
+        continue;
+      }
+      let j = i;
+      while (j < str.length && !/\s/.test(str[j]) && str[j] !== '"' && str[j] !== "'") j++;
+      const run = str.slice(i, j);
+      if (!/^[0-9A-Fa-f]+$/.test(run)) throw new Error('Valor hexadecimal inválido: ' + run);
+      for (let k = 0; k < run.length; k += 2) bytes.push(parseInt(run.slice(k, k + 2), 16));
+      i = j;
+    }
+    return bytes;
+  }
+
   function cmdEnter(rest) {
-    const tokens = rest.trim() ? rest.trim().split(/\s+/) : [];
-    if (tokens.length < 2) throw new Error('Uso: e seg:off byte [byte...]');
-    const a = parseAddr(tokens[0], cpu.sreg.DS);
+    const trimmed = rest.trim();
+    const { head, rest: listStr } = splitFirstToken(trimmed);
+    if (!head || !listStr.trim()) throw new Error('Uso: e seg:off byte|"texto" [byte|"texto" ...]');
+    const a = parseAddr(head, cpu.sreg.DS);
+    const bytes = tokenizeEnterList(listStr);
     let off = a.off;
-    for (let i = 1; i < tokens.length; i++) {
-      const val = parseHex(tokens[i]);
-      if (val > 0xFF) throw new Error('Byte fuera de rango: ' + tokens[i]);
+    for (const val of bytes) {
       cpu.writeByte(a.seg, off, val);
       off = (off + 1) & 0xFFFF;
     }
@@ -285,6 +330,7 @@
 
   function cmdReset() {
     cpu.reset();
+    outputCursor = 0;
     state.mode = 'normal';
     state.cursorSeg = cpu.sreg.DS;
     state.cursorOff = 0;
@@ -304,7 +350,7 @@
       '  a [dir]        entra en modo ensamblado línea por línea; línea vacía sale',
       '  t [n]          ejecuta n instrucciones (1 por defecto) y muestra registros',
       '  g [dir]        corre hasta HLT o hasta llegar a la dirección (breakpoint)',
-      '  e dir b b ...  escribe bytes crudos en memoria',
+      '  e dir b|"txt" ...  escribe bytes hex y/o texto entre comillas en memoria (ej: e 102 "Hola"0D0A"$")',
       '  reset          reinicia la CPU de debug (registros, memoria y flags)',
       '  cls            limpia la pantalla (no toca CPU ni memoria)',
       '  q              vuelve al modo visual',
