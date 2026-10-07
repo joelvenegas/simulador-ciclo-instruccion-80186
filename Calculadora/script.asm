@@ -70,3 +70,23 @@ main ENDP
 ;restriccion: usar direccionamiento indexado (SI/DI) y
 ;dos punteros (uno desde el inicio y otro desde el final del arreglo)
 ;para intercambiar los valores en el propio arreglo (in-place)
+
+mov SI, arreglo ;Puntero al inicio del arreglo
+mov CX, 000A ;Cantidad de elementos del arreglo
+
+inicio_loop_guardar:
+  mov AL, [SI]     ;leo el byte actual del arreglo
+  mov AH, 0        ;AH en 0 para pushear un word valido
+  push AX ;Guardo el valor del arreglo en la pila
+  inc SI ;Avanzo el puntero al siguiente elemento
+  loop inicio_loop_guardar
+
+mov cx, 000A ;Cantidad de elementos del arreglo
+mov SI, arreglo ;Puntero al inicio del arreglo
+
+inicio_loop_invertir:
+  pop AX ;Recupero el valor de la pila
+  mov [SI], AL ;guardo solo el byte bajo en el arreglo
+  loop inicio_loop_invertir
+
+arreglo db 01h, 02h, 03h, 04h, 05h, 06h, 07h, 08h, 09h, 0Ah ;Arreglo de 10 elementos
